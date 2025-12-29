@@ -1,0 +1,115 @@
+#Universidad de Wyoming (NOAA) → estación 76679 (Ciudad de México): http://weather.uwyo.edu/upperair/sounding.html
+
+#Descargas el radiosondeo (00 UTC o 12 UTC).
+
+perfil <- df
+
+
+# Calcular gradiente vertical (ΔT / Δz)
+perfil$gradiente <- c(NA, diff(perfil$temperature_C) / diff(perfil$geopotential.height_m))
+
+# Detectar inversión: gradiente > 0
+perfil$inversion <- perfil$gradiente > 0
+
+print(perfil)
+
+# Encontrar índices donde empieza y termina la inversión
+inv_indices <- which(perfil$inversion)
+
+if (length(inv_indices) > 0) {
+  base <- perfil$geopotential.height_m[min(inv_indices)]
+  cima <- perfil$geopotential.height_m[max(inv_indices) + 1]
+  deltaT <- perfil$temperature_C[max(inv_indices) + 1] - perfil$temperature_C[min(inv_indices)]
+  espesor <- cima - base
+  
+  cat("Base de la inversión:", base, "m\n")
+  cat("Cima de la inversión:", cima, "m\n")
+  cat("Intensidad (ΔT):", deltaT, "°C\n")
+  cat("Espesor:", espesor, "m\n")
+} else {
+  cat("No se detectó inversión térmica\n")
+}
+
+library(ggplot2)
+
+ggplot(perfil, aes(x = temperature_C, y = geopotential.height_m)) +
+  geom_line(color = "blue") +
+  geom_point() +
+  labs(x = "Temperatura (°C)", y = "Altura (m)",
+       title = "Perfil térmico con detección de inversión") +
+  theme_minimal() 
+
+
+
+# ================================
+# Función para detectar inversiones térmicas
+# ================================
+detectar_inversiones <- function(perfil) {
+  # Ordenar datos por altura (por si no lo están)
+  perfil <- perfil[order(perfil$geopotential.height_m), ]
+  
+  # Calcular gradiente térmico vertical (ΔT/Δz)
+  perfil$gradiente <- c(NA, diff(perfil$temperature_C) / diff(perfil$geopotential.height_m))
+  
+  # Marcar si hay inversión (gradiente > 0)
+  perfil$inversion <- perfil$gradiente > 0
+  
+  # Identificar tramos de inversión consecutivos
+  rle_inv <- rle(perfil$inversion)
+  
+  resultados <- data.frame(
+    base_m = numeric(),
+    cima_m = numeric(),
+    intensidad_C = numeric(),
+    espesor_m = numeric()
+  )
+  
+  pos <- 1
+  for (i in seq_along(rle_inv$lengths)) {
+    if (rle_inv$values[i] == TRUE) {
+      idx_ini <- pos
+      idx_fin <- pos + rle_inv$lengths[i]
+      
+      base <- perfil$geopotential.height_m[idx_ini]
+      cima <- perfil$geopotential.height_m[idx_fin]
+      deltaT <- perfil$temperature_C[idx_fin] - perfil$temperature_C[idx_ini]
+      espesor <- cima - base
+      
+      resultados <- rbind(resultados, data.frame(
+        base_m = base,
+        cima_m = cima,
+        intensidad_C = deltaT,
+        espesor_m = espesor
+      ))
+    }
+    pos <- pos + rle_inv$lengths[i]
+  }
+  
+  return(list(perfil = perfil, inversiones = resultados))
+}
+
+
+
+resultado <- detectar_inversiones(perfil)
+
+# Mostrar tabla de inversiones detectadas
+print(resultado$inversiones)
+
+# ================================
+# Gráfico del perfil con inversiones
+# ================================
+library(ggplot2)
+
+ggplot(resultado$perfil, aes(x = temperature_C, y = geopotential.height_m)) +
+  geom_line(color = "blue") +
+  geom_point() +
+  labs(x = "Temperatura (°C)", y = "Altura (m)",
+       title = "Perfil térmico con inversiones detectadas") +
+  theme_minimal() +
+  geom_rect(
+    data = resultado$inversiones,
+    aes(xmin = min(perfil$temp) - 1, xmax = max(perfil$temp) + 1,
+        ymin = base_m, ymax = cima_m),
+    inherit.aes = FALSE, alpha = 0.2, fill = "red"
+  )
+
