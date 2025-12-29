@@ -1,0 +1,47 @@
+setwd("~/Desktop/Clase R")
+
+getMet <- function(year = 2019, month = 1, path_met = "~/Desktop/Clase R/Meteo") {
+  for (i in seq_along(year)) {
+    for (j in seq_along(month)) {
+      download.file(url =  paste0("ftp://arlftp.arlhq.noaa.gov/archives/reanalysis/RP", year[i], sprintf("%02d", month[j]), ".gbl")
+              destfile = paste0(path_met, "RP", year [i], sprintf("%02d", month[j]), ".gbl"), mode = "wb")
+    }
+  }
+}
+getMet(year = 2019, month = 1)
+
+## download Hysplit
+
+
+library(openair)
+library(tidyverse)
+library(lubridate)
+library(stringi)
+library(stringr)
+library(usethis)
+library(devtools)
+library(purrr)
+library(readr)
+
+source_gist("https://gist.github.com/davidcarslaw/c67e33a04ff6e1be0cd7357796e4bdf5",
+            filename = "run_hysplit.R")
+
+traj_CUA <- run_hysplit(
+  latitude = 19.722, 
+  longitude = -99.198,  
+  runtime = -24,
+  start_height = 10,
+  model_height = 10000,
+  start = "2023-12-01",
+  end = "2023-12-23",
+  hysplit_exec = "C:/hysplit/exec",
+  hysplit_input = "C:/TrajData",
+  hysplit_output = "~/Trajectory_out",
+  site = "cuautitlan")
+
+saveRDS(traj_CUA, file = "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/Traj_Data.rds")
+
+traj <- readRDS("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/Traj_Data.rds")
+
+
+
