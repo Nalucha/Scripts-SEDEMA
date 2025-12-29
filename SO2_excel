@@ -1,0 +1,120 @@
+rm(list=ls())
+gc(reset = TRUE)
+
+library(lubridate)
+library(openair)
+library(readr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(plotly)
+library(readxl)
+library(dplyr)
+library(xlsx)
+
+##abrir xls
+
+ws <- read_xls("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2017/2017PM10.xls")
+
+
+## abrir xlsx
+ws <- read_xlsx("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2020/2020SO4H.xlsx")
+
+View(ws)
+
+PM10<- ws %>% mutate(across(where(is.numeric), ~na_if(., -99)))
+
+View(PM10)
+
+# Asegúrate de que HORA sea numérico y convierte 24 a "00:00"
+PM10$HORA <- as.numeric(PM10$HORA)
+
+PM10$HORA <- ifelse(PM10$HORA == 24, "24:00", sprintf("%02d:00", PM10$HORA))
+
+
+# Combina FECHA y HORA en el formato correcto
+PM10$FECHA_HORA <- paste(PM10$FECHA, PM10$HORA)
+
+# Convierte a POSIXct usando el formato correcto CUIDADO NO FUNCIONA
+
+PM10$FECHA_HORA <- as.POSIXct(PM10$FECHA_HORA, format = "%Y-%m-%d %H:%M")
+
+colnames(PM10)[colnames(PM10) == "FECHA_HORA"] <- "date"
+
+write.csv(PM10, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2017/PM10.csv")
+
+
+##bases depositos
+
+so4h13$FECHA <- as.POSIXct(so4h13$FECHA, format = "%d/%m/%Y")
+
+write.csv(so4h19, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2019/so4h19.csv")
+
+
+colnames(so4h13)[colnames(so4h13) == "FECHA"] <- "date"
+
+write.csv(so4h13, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2013/so4h13.csv")
+
+
+PM101 <- selectByDate(PM10, start = "2017-12-13", end = "2017-12-16")
+
+
+View(PM101)
+
+write.csv(PM101, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2017/PM101.csv")
+
+
+
+# Convierte a POSIXct usando el formato correcto CUIDADO NO FUNCIONA
+
+so4h21$date <- as.POSIXct(so4h21$date, format = "%Y-%m-%d")
+
+
+
+
+#  grafica interactiva Plotly
+
+fig <- plot_ly(so24, x = ~date, y = ~CHO, name = 'CHO', type = 'scatter', mode = 'lines',
+               line = list(color = 'grey', width = 2)) 
+
+fig <- fig %>% add_trace(y = ~UAX, name = 'UAX', line = list(color = 'blue', width = 2))
+
+fig <- fig %>% add_trace(y = ~AJM, name = 'AJM', line = list(color = 'purple', width = 2))
+
+fig <- fig %>% add_trace(y = ~TAH, name = 'TAH', line = list(color = 'green', width = 2))
+
+fig <- fig %>% add_trace(y = ~MPA, name = 'MPA', line = list(color = 'orange', width = 2))
+
+fig <- fig %>% add_trace(y = ~NEZ, name = 'NEZ', line = list(color = 'aquamarine', width = 2))
+
+fig <- fig %>% add_trace(y = ~UIZ, name = 'UIZ', line = list(color = 'violet', width = 2))
+
+fig <- fig %>% add_trace(y = ~PED, name = 'PED', line = list(color = 'red', width = 2))
+
+fig <- fig %>% layout(title = "SO2 2024 estaciones sur",
+                      xaxis = list(title = "Fecha"),
+                      yaxis = list (title = "SO2 ppb"))
+
+fig
+
+
+
+fig <- plot_ly(so24, x = ~date, y = ~CUT, name = 'CUT', type = 'scatter', mode = 'lines',
+               line = list(color = 'rgb(205, 12, 24)', width = 2)) 
+
+fig <- fig %>% add_trace(y = ~VIF, name = 'VIF', line = list(color = 'blue', width = 2))
+
+fig <- fig %>% add_trace(y = ~LLA, name = 'LLA', line = list(color = 'purple', width = 2))
+
+fig <- fig %>% add_trace(y = ~SAG, name = 'SAG', line = list(color = 'orange', width = 2))
+
+fig <- fig %>% add_trace(y = ~ATI, name = 'ATI', line = list(color = 'yellow', width = 2))
+
+fig <- fig %>% add_trace(y = ~TLI, name = 'TLI', line = list(color = 'green', width = 2))
+
+fig <- fig %>% layout(title = "SO2 2024 estaciones norte",
+                      xaxis = list(title = "Fecha"),
+                      yaxis = list (title = "SO2 ppb"))
+
+fig
