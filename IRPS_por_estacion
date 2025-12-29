@@ -1,0 +1,157 @@
+rm(list = ls())
+gc(reset = T)
+
+
+library("reshape2")
+library("openair")
+library("plyr")
+library("dplyr")
+library("scales")
+library("RMySQL")
+library("rpart")
+library("rlist")
+library("evola3")
+library(tidyr)
+library(lubridate)
+library(readr)
+
+
+def_user("estadistica", servidor = 134)
+
+o3 <- read.csv("C:/Users/analisis/Documents/IRPS/Bases_modeladas/o3_modelado.csv")
+
+View(o3)
+
+##### OZONO  ki
+
+O3 <- movil_con(parametro = "o3", start = "2018-01-01", end = "2018-01-31", 
+                temporal = "NO", horizontal = F) %>% 
+  dplyr::mutate(hour = hour(date)) %>%
+  dplyr::filter(hour %in% 7:21) %>%
+  dplyr::select(-hour) %>%
+  dplyr::mutate(Date = as.Date(date)) %>%
+  dplyr::group_by(id_station, Date) %>%
+  dplyr::summarise(
+    max = if (sum(is.na(valor)) > 6 || all(is.na(valor))) { NA_real_  } else {
+      max(valor, na.rm = TRUE)  
+    }, .groups = "drop")%>%
+  dplyr::rename(valor = max) %>%
+  pivot_wider(names_from = id_station, values_from = valor)
+
+
+# Imputar datos
+O3=evola3::imputar_datos_ICAS(O3,parametro = "o3")
+
+# Quitar estaciones sin datos
+
+est_O3=colnames(O3)
+
+if(sum(colSums(is.na(O3)) == nrow(O3))==0 ) { est_O3=est_O3 }else{
+  est_O3=est_O3[-which(colSums(is.na(O3)) == nrow(O3) )]  }
+
+# Quitar estaciones sin datos
+O3=O3[,which(colnames(O3) %in% est_O3 )]
+
+
+# Convertir base a formato largo
+O3 <- O3 %>%
+  pivot_longer( cols = -1, names_to = "variable", values_to = "o3") %>%
+  dplyr::rename(date = Date)
+
+
+
+##### PM25
+
+PM25 <- promedio_con(parametro = "pm25", start = "1/1/2024", end = "31/12/2024", 
+                     temporal = "NO", horizontal = T) 
+
+
+# Imputar datos
+PM25=evola3::imputar_datos_ICAS(PM25,parametro = "pm25")
+
+# Quitar columnas sin datos
+est_PM25=colnames(PM25)
+
+if(sum(colSums(is.na(PM25)) == nrow(PM25))==0 )  { est_PM25=est_PM25 }else{
+  est_PM25=est_PM25[-which(colSums(is.na(PM25)) == nrow(PM25) )] }
+
+PM25=PM25[,which(colnames(PM25) %in% est_PM25 )]
+
+# Convertir base a formato largo
+PM25<- PM25%>%
+  pivot_longer( cols = -1, names_to = "variable", values_to = "pm25")
+
+
+#### NO2
+
+NO2 <- rama_con(parametro = "no2", start = "1/1/2024", end = "31/12/2024", 
+                temporal = "NO", horizontal = F) %>% 
+  dplyr::mutate(date = as.Date(date)) %>%
+  dplyr::group_by(id_station, date) %>%
+  dplyr::summarise(
+    max = if (sum(is.na(valor)) > 6 || all(is.na(valor))) { NA_real_  } else {
+      max(valor, na.rm = TRUE)  
+    }, .groups = "drop")%>%
+  dplyr::rename(valor = max)%>%
+   pivot_wider(names_from = id_station, values_from = valor)
+
+# Imputar datos
+NO2=evola3::imputar_datos_ICAS(NO2,parametro = "no2")
+
+# Quitar columnas sin datos
+est_NO2=colnames(NO2)
+
+if(sum(colSums(is.na(NO2)) == nrow(NO2))==0 ) { est_NO2=est_NO2 }else{
+  est_NO2=est_NO2[-which(colSums(is.na(NO2)) == nrow(NO2) )] }
+
+NO2=NO2[,which(colnames(NO2) %in% est_NO2 )]
+
+# Convertir base a formato largo
+NO2<- NO2 %>%
+  pivot_longer( cols = -1, names_to = "variable", values_to = "no2")
+
+
+# Union de base de datos
+base=merge(O3,PM25,by=c("date","variable"))
+base=merge(base,NO2,by=c("date","variable"))
+names(base)[2]="id_station"
+
+# Se saca el promedio de los contaminantes por dia y estacion
+base_dia <- timeAverage(
+  base,
+  avg.time   = "day",
+  statistic  = "mean",
+  type       = "id_station",  # agrupa por estación
+  data.thresh = 75            # opcional: exige ≥75% de datos en el día
+)
+
+# Se calcula el IRPS con la funcion de evola 3
+icas <- irps(base_dia, redondear = TRUE, por.estacion = TRUE)
+
+IRPS_a <- icas$index_value  ############################## ESTE ES EL IRPS OBSERVADO
+
+
+### Cálculo a mano de IRPS
+
+df_completo <- base_dia %>%
+  dplyr::mutate(
+    pm_excess_risk  = pmax(0, 100 * (exp(0.002585751 * pm25) - 1)),
+    o3_excess_risk  = pmax(0, 100 * (exp(0.001592821 * o3)   - 1)),
+    no2_excess_risk = pmax(0, 100 * (exp(0.0005243433 * no2) - 1)),
+    
+    # suma permitiendo NAs (como la función), y NA solo si los 3 son NA
+    total_excess = rowSums(across(c(pm_excess_risk, o3_excess_risk, no2_excess_risk)),
+                           na.rm = TRUE),
+    total_excess = if_else(is.na(pm25) & is.na(o3) & is.na(no2),
+                           NA_real_, total_excess),
+    
+    # c.val = "ext" => 37; si quisieras "int", cambia esto por max(total_excess, na.rm = TRUE)
+    c_value = 37,
+    
+    IRPS = (10 / c_value) * total_excess,
+   
+    IRPS = if_else(is.na(pm25) & is.na(o3), NA_real_, IRPS),
+    
+    
+    IRPS = redondeo(IRPS, 0)
+  )
