@@ -1,0 +1,78 @@
+library(evola3)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(openair)
+
+#Ozono
+setwd("~/Desktop/Clase R/Bases_modeladas")
+
+o3 <- read.csv("~/Desktop/Clase R/Bases_modeladas/o3_modelado.csv")
+
+View(o3)
+
+o31 <- selectByDate(o3, start = "2018-01-01", end = "2018-01-31")
+
+o31 <- o31 %>%
+  mutate(date_only = as.Date(date))
+
+o8h = promedio(o31$value_24h, n = 8, movil = TRUE, red = 0)
+
+o31$o8h <- o8h
+View(o31)
+
+omax_diarios <- o31 %>%
+  group_by(id_station, date_only) %>%
+  summarise(
+    max_diario = if (sum(is.na(o8h)) > 6 || all(is.na(o8h))) {
+      NA_real_
+    } else {
+      max(o8h, na.rm = TRUE)
+    },
+    .groups = "drop"
+  )
+
+## PM
+setwd("~/Desktop/Clase R/Bases_modeladas")
+
+pm <- read.csv("~/Desktop/Clase R/Bases_modeladas/pm25_modelado.csv")
+
+pm25 <- selectByDate(pm, start = "2018-01-01", end = "2018-01-31")
+
+pm25 <- pm25 %>%
+  mutate(date_only = as.Date(date))
+
+pm24h_df <- pm25 %>%
+  group_by(id_station) %>%
+  mutate(pm24h = promedio(value_24h, n = 24, movil = TRUE, red = 0)) %>%
+  ungroup() %>%
+  mutate(date_only = as.Date(date)) %>%   # extraer solo la fecha
+  group_by(id_station, date_only) %>%
+  summarise(
+    pm24h = last(pm24h),   # toma el valor final del día
+    .groups = "drop"
+  )
+
+## NO2
+
+setwd("~/Desktop/Clase R/Bases_modeladas")
+
+no <- read.csv("~/Desktop/Clase R/Bases_modeladas/no2_modelado.csv")
+
+no2 <- selectByDate(no, start = "2018-01-01", end = "2018-01-31")
+
+no2 <- no2 %>%
+  mutate(date_only = as.Date(date))
+
+no2max <- no2 %>%
+  group_by(id_station, date_only) %>%
+  summarise(
+      max(value_24h, na.rm = TRUE),
+    .groups = "drop")
+
+
+# Union de base de datos
+base=merge(omax_diarios,pm24h_df,by=c("date","pm24"))
+base=merge(omax_diarios,no2max,by=c("date","variable"))
+names(base)[2]="id_station"
+
