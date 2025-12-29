@@ -1,0 +1,319 @@
+rm(list=ls())
+gc(reset = TRUE)
+
+library(lubridate)
+library(openair)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+
+##abriendo bases, modificando y eliminando NA
+
+##  OJO RECORDAR QUE LAS BASES SE PUSIERON EN OTRA CARPETA
+
+so24 <- read_xls("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/2024/2024SO2.xls")
+
+View(so24)
+
+so24_1 <- so24%>% pivot_longer(cols = c(-FECHA, -HORA), names_to="id_station", values_to="valor")
+
+View(so24_1)
+
+so24_clean <- so24_1 %>% mutate(across(where(is.numeric), ~ na_if(., -99)))
+
+View(so24_clean)
+
+write.csv(so24_clean, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/2024/so24_clean.csv")
+
+
+
+## eliminar estaciones nuevas
+View(o23_clean)
+
+est_filtrar <- c("FAR", "LAA", "SAC", "COY", "SJA", "ATI", "GAM", "INN", "HGM", "TAH", "TLI", "XAL")
+
+o23_ssta <- subset(o23_clean, !id_station %in% est_filtrar)
+
+View(o23_ssta)
+
+write.csv(o23_ssta, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2023/o23_ssta.csv")
+
+
+## suficiencia
+
+o23 <- read_xls("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2023/2023O3.xls")
+
+View(o23)
+library(dplyr)
+
+o23_1 <- o23 %>% mutate(across(where(is.numeric), ~ na_if(., -99)))
+
+View(o23_clean)
+
+na_counts <- o23_clean %>% summarise_all(~ sum(is.na(.)))
+
+View(na_counts)
+
+
+# Cargar las bases de datos
+df_2017 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2017/so17_clean.csv")
+
+View(df_2017)
+
+df_2018 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2018/so18_clean.csv")
+View(df_2018)
+
+df_2019 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2019/so19_clean.csv")
+View(df_2019)
+df_2020 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2020/so20_clean.csv")
+View(df_2020)
+df_2021 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2021/so21_clean.csv")
+View(df_2021)
+df_2022 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_clean.csv")
+View(df_2022)
+df_2023 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2023/so2_clean.csv")
+View(df_2023)
+ls()
+
+df_2019<- subset(df_2019, select = -c(X.1))
+df_2020<- subset(df_2020, select = -c(X.1))
+df_2021<- subset(df_2021, select = -c(X.1))
+df_2023<- subset(df_2023, select = -c(X.1))
+
+View(df_2020)
+
+# Combinar todos los dataframes
+combined_df <- rbind(df_2017, df_2018, df_2019, df_2020, df_2021, df_2022, df_2023)
+
+library(dplyr)
+
+# Lista de archivos y años
+file_paths <- list("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2023/so2_clean.csv", "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_clean.csv", "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2021/so21_clean.csv", "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2020/so20_clean.csv", "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2019/so19_clean.csv", "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2018/so18_clean.csv", "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2017/so17_clean.csv")
+years <- c(2017, 2018, 2019, 2020, 2021, 2022, 2023)
+
+# Cargar y combinar
+data_list <- lapply(seq_along(file_paths), function(i) {
+  df <- read.csv(file_paths[[i]])
+  df$year <- years[i]  # Agregar columna de año
+  return(df)
+})
+
+# Unir todos los dataframes en uno
+combined_df <- bind_rows(data_list)
+
+View(combined_df)
+
+so2_df <- combined_df
+
+View(so2_df)
+
+so2_df<- subset(combined_df, select = -c(X.1, year))
+
+write.csv(so2_df, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2023/so2_df.csv")
+
+# Supongamos que tu columna FECHA se llama combined_df$FECHA
+
+# Convierte las fechas en formato YMD a formato DMY
+
+
+#combined_df$FECHA <- ifelse(
+ grepl("^2023\\d{6}$", combined_df$FECHA),  # Verifica si está en formato YMD
+  format(as.POSIXct(combined_df$FECHA, format = "%Y%m%d"), "%Y%m%d"),
+  combined_df$FECHA  # Si no está en formato YMD, deja la fecha como está
+)
+
+# Asegúrate de que HORA sea numérico y convierte 24 a "00:00"
+so24_clean$HORA <- as.numeric(so24_clean$HORA)
+so24_clean$HORA <- ifelse(so24_clean$HORA == 24, "00:00", sprintf("%02d:00", so24_clean$HORA))
+
+
+# Combina FECHA y HORA en el formato correcto
+so24_clean$FECHA_HORA <- paste(so24_clean$FECHA, so24_clean$HORA)
+
+
+
+so24_clean <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2024/so24_clean.csv", stringsAsFactors = TRUE)
+
+
+
+# Convierte a POSIXct usando el formato correcto CUIDADO NO FUNCIONA
+so24_clean$FECHA_HORA <- as.POSIXct(so24_clean$FECHA_HORA, format = "%Y-%m-%d %H:%M")
+
+
+write.csv(so24_clean, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2024/so24_clean.csv")
+
+
+so22_clean$date <- as.POSIXct(so22_clean$date, format = "%Y-%m%d %H:%M:%S")
+# Verifica el resultado
+print(head(so23_clean$FECHA_HORA))
+
+colnames(so22_sur)[colnames(so22_sur) == "FECHA_HORA"] <- "date"
+
+
+write.csv(so22_clean, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_clean.csv")
+
+write.csv(so22_nor, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_nor.csv")
+
+
+wsd23_clean1<- subset(wsd23_clean, select = -c(date))
+
+View(wsd23_clean1)
+
+
+write.csv(wsd23_clean1, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2023/wsd_clean1.csv")
+
+
+##ahora si se puede trabajar
+
+
+timePlot(combined_df, pollutant = "valor", avg.time = "year", na.rm= TRUE)
+
+trendLevel(combined_df, pollutant = "valor")
+
+TheilSen(combined_df, pollutant = "valor", ylab = "ozone (ppb)", alpha = 0.01)
+
+
+
+timeVariation(so22_sur, pollutant = "valor", normalise = TRUE)
+
+tvar <- timeVariation(combined_df, pollutant = "valor", normalise = TRUE)
+
+head(tvar$data$day.hour)
+
+## ABRIR archivo, ya que el import no sirve y abre mal los datos FUNCIONA
+so22_2 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_clean.csv", stringsAsFactors = TRUE)
+
+View(so22_2)
+
+class(so22_2$FECHA_HORA)
+
+so22_2$FECHA_HORA <- as.POSIXct(so22_2$FECHA_HORA, format = "%Y-%m-%d %H:%M")
+
+class(so22_2$FECHA_HORA)
+
+write.csv(so22_2, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_2.csv")
+
+
+##Seleccionar estaciones de un dataframe
+w19 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2019/wsd19_clean.csv")
+
+View(w19)
+
+est_filtrar <- c("ACO", "AJM", "BJU", "CHO", "CUA", "CUT", "FAC", "FAR", "HGM", "INN", "MER", "MGH", "MON", "MPA", "NEZ", "PED", "SAC", "SAG", "SFE", "TAH", "TLA", "UAX", "UIZ", "VIF", "XAL")
+
+w191 <- subset(w19, id_station %in% est_filtrar)
+
+View(w191)
+
+# Asegúrate de que HORA sea numérico y convierte 24 a "00:00"
+so191$HORA <- as.numeric(so191$HORA)
+
+class(so191$HORA)
+
+so191$HORA_FORMATO <- ifelse(so191$HORA == 24, "00:00", sprintf("%02d:00", so191$HORA))
+
+
+
+# Combina FECHA y HORA en el formato correcto
+so191$FECHA_HORA <- paste(so191$FECHA, so191$HORA_FORMATO)
+
+
+#Convierte a POSIXct usando el formato correcto CUIDADO NO FUNCIONA
+
+so191$FECHA_HORA <- as.POSIXct(so191$FECHA_HORA, format = "%Y-%m-%d %H:%M")
+
+colnames(so191)[colnames(so191) == "FECHA_HORA"] <- "date"
+
+
+write.csv(w191, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2019/w191.csv")
+
+
+
+
+vif <- selectByDate(so23_VIF, start = "2023-02-04", end = "2023-02-04")
+
+mean(vif$valor)
+
+##graficar so2
+
+ggplot(so22_sur, aes(x = FECHA, y = valor)) +
+  geom_line() +  labs(title = "Estaciones", x = "Fecha", y = "Valor")
+
+
+##cambiar la fecha
+
+so22_nor$date <- as.POSIXct(so22_nor$date, format = "%Y-%m-%d %H:%M")
+
+
+## par ver varias estaciones
+ggplot(so22_nor, aes(x = FECHA, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Estaciones", x = "Fecha", y = "SO2 ppb") +
+  scale_color_discrete(name = "Estación") # Opcional, para añadir una leyenda personalizada
+
+## cambio de colores
+ggplot(so22_nor, aes(x = FECHA, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Estaciones NOrte 2022", x = "Fecha", y = "Valor") +
+  scale_color_manual(values = c("VIF" = "blue", "CUT" = "green3", "ACO"="red", "ATI"="purple", "TLI"="orange")) + theme_gray()
+
+## una gráfica por estación BIEN
+
+so22_nor$FECHA <- as.Date(as.character(so22_nor$FECHA), format = "%Y-%m-%d")
+
+class(so22_nor$FECHA)
+
+ggplot(so22_nor, aes(x = FECHA, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Estaciones norte ZMVM 2022", x = "Fecha", y = "ppb SO2") +
+  facet_wrap(~ id_station) +
+  scale_color_manual(values = c("ATI" = "blue", "ACO" = "green3", "CUT"="red", "TLI"="purple", "VIF"= "orange")) + theme_gray() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(legend.position = "none")   
+ 
+
+##estaciones separadas a colores CORRECTO
+
+ggplot(so22_sur, aes(x = FECHA, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Estaciones sur ZMVM 2022", x = "Fecha", y = "SO2 ppb") +
+  facet_wrap(~ id_station) +
+  theme_minimal() +
+  scale_color_manual(values = c("AJM" = "blue", "CHO" = "green3", "TAH"="red", "MPA"="purple")) +
+  scale_x_date(date_breaks = "2 month", date_labels = "%b") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(legend.position = "none") +
+  scale_x_date(date_labels = "%b %d", date_breaks = "1 month")
+
+
+max(so23_s$valor, na.rm = TRUE)
+
+
+
+
+## encontrar la fecha del valor max
+
+so22_2 <- read.csv("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/conta_2022/so22_nor.csv", stringsAsFactors = TRUE)
+
+View(so22_2)
+
+est_filtrar <- c("ATI")
+
+so22_cho <- subset(so22_2, id_station %in% est_filtrar)
+
+indice_max <- which.max(so22_cho$valor)
+
+indice_max
+
+fecha_max <- so22_cho$FECHA[indice_max]
+
+fecha_max
+
+
+
+
+
+
