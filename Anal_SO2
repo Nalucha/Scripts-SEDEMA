@@ -1,0 +1,161 @@
+rm(list=ls())
+gc(reset = TRUE)
+
+library(lubridate)
+library(openair)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+
+## episodio
+
+so24 <- read_xls("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/2024SO2.xls")
+
+View(so24)
+
+so24_1 <- so24%>% pivot_longer(cols = c(-FECHA, -HORA), names_to="id_station", values_to="valor")
+
+so24_clean <- so16_1 %>% mutate(across(where(is.numeric), ~ na_if(., -99)))
+
+View(so24_clean)
+
+write.csv(so24_clean, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/so24_clean.csv")
+
+## Análisis Popocatépetl
+
+popo16 <- so16_clean%>% filter(valor > 20)
+
+View(popo16)
+
+est_filtrar <- c("CHO", "AJM", "TPN", "MPA", "UAX")
+
+pop16 <- subset(popo16, id_station %in% est_filtrar)
+
+View(pop16)
+
+write.csv(pop16, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/pop16.csv")
+
+
+## Inicio de excel GRAFICA EVENTO
+
+so13 <- read_xls("C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/2020SO2.xls")
+
+View(so13)
+
+so2_1 <- so13%>% pivot_longer(cols = c(-FECHA, -HORA), names_to="id_station", values_to="valor")
+
+so13_clean <- so13_1 %>% mutate(across(where(is.numeric), ~ na_if(., -99)))
+
+View(so13_clean)
+
+write.csv(so13_clean, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/so13_clean.csv")
+
+
+
+
+
+# Asegúrate de que HORA sea numérico y convierte 24 a "00:00"
+so16_clean$HORA <- as.numeric(so16_clean$HORA)
+
+so16_clean$HORA <- ifelse(so16_clean$HORA == 24, "00:00", sprintf("%02d:00", so16_clean$HORA))
+
+
+# Combina FECHA y HORA en el formato correcto
+so16_clean$FECHA_HORA <- paste(so16_clean$FECHA, so16_clean$HORA)
+
+# Convierte a POSIXct usando el formato correcto CUIDADO NO FUNCIONA
+
+so16_clean$FECHA_HORA <- as.POSIXct(so19_clean$FECHA_HORA, format = "%Y-%m-%d %H:%M")
+
+
+View(so16_clean)
+
+# Formatear la columna FECHA para asegurarse de que muestra hora
+so16_clean$FECHA_HORA <- format(so16_clean$FECHA_HORA, "%Y-%m-%d %H:%M:%S")
+
+View(so19_clean)
+
+
+colnames(so16_clean)[colnames(so16_clean) == "FECHA_HORA"] <- "date"
+
+
+write.csv(so16_clean, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/so16_clean.csv")
+
+##Seleccionar estaciones de un dataframe
+est_filtrar <- c("CHO", "TPN", "UAX", "AJM", "CCA")
+
+so14_popo <- subset(so14_clean, id_station %in% est_filtrar)
+
+View(so14_popo)
+
+evpop14 <- selectByDate(so14_popo, start = "2014-11-26", end = "2014-11-30")
+
+
+View(evpop153)
+
+class(evpop14$date)
+
+
+ev173pop$date <- ymd_hms(ev173pop$date)
+
+class(ev173pop$date)
+
+write.csv(evpop14, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/evpop14.csv")
+
+## cambio de formato las estaciones son columna
+e21 <- ev_21 %>%
+  pivot_wider(names_from = id_station, values_from = valor, values_fn = list)
+
+View(e21)
+
+write.csv(e21, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/SO2/e21.csv")
+
+
+library(scales)
+
+## cambio de colores
+
+ggplot(evpop14, aes(x = date, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Popocatépetl evento noviembre 2014", x = "fecha", y = "ppb SO2") +
+  scale_color_manual(values = c("CHO"="red", "CCA"="green2", "UAX"="blue2", "TPN"= "purple", "MPA"="green4")) +
+  theme_minimal() +
+  scale_x_datetime(breaks = "6 hours", labels = date_format("%m%d %H:%M:%S")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## Popocatepetl
+ggplot(ev22pop, aes(x = date, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Popocatépetl 2021", x = "fecha", y = "Valor") +
+  scale_color_manual(values = c("TAH"="red", "MPA"="purple", "CHO"="blue", "AJM"= "green3")) + theme_gray() +
+  scale_x_datetime(breaks = "10 day", labels = scales::date_format("%D")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## una gráfica por estación BIEN
+
+ggplot(ev_21, aes(x = date, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Estaciones febrero 20 ZMVM 2021", x = "fecha", y = "ppb SO2") +
+  facet_wrap(~ id_station) +
+  scale_color_manual(values = c("NEZ" = "blue", "MER" = "green3", "CAM"="red", "GAM"="purple")) + theme_gray() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(legend.position = "none") +   
+  scale_x_datetime(breaks = "1 hour", labels = scales::date_format("%Y-%m-%d %H:%M:%S")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+##estaciones separadas a colores CORRECTO
+
+ggplot(ev_21, aes(x = FECHA, y = valor, color = id_station)) +
+  geom_line() +
+  labs(title = "Estaciones evento 20 febrero 2021", x = "Fecha", y = "SO2 ppb") +
+  facet_wrap(~ id_station) +
+  theme_minimal() +
+  scale_color_manual(values = c("NEZ" = "blue", "MER" = "green3", "CAM"="red", "VIF"="purple")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(legend.position = "none") 
+  
