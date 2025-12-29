@@ -1,0 +1,114 @@
+library(dplyr)
+library(tidyr)
+library(openair)
+library(lubridate)
+
+
+
+all_irps1 <- all_irps %>%
+  mutate(date = as.Date(date))
+
+
+# Supongamos que tus columnas de modelos son estas
+mod <- c("irps24h", "irps24kf", "irps48h", "irps48kf")
+
+dat_long <- all_irps1 %>%
+  pivot_longer(cols = c("irps24h", "irps24kf", "irps48h", "irps48kf"),
+               names_to = "model",
+               values_to = "value")
+
+head(dat_long)
+
+dat_long$model <- factor(dat_long$model)
+
+
+TaylorDiagram(dat_long,
+              obs = "irps_obs",
+              mod = "value",
+              group = "model",
+              col = c("red","blue","green","purple"),
+              annotate = TRUE,
+              plot = TRUE,
+              main = "Taylor Diagram")
+
+
+
+
+
+library(openair)
+library(dplyr)
+library(tidyr)
+
+all_irps1$id_station <- as.factor(all_irps1$id_station)
+stations <- unique(all_irps1$id_station)
+
+pdf("C:/Users/analisis/Documents/IRPS/Taylor/taylor_por_estacion4.pdf", 
+    width = 7, height = 7)
+
+for (st in stations) {
+  dat_st <- all_irps1 %>%
+    filter(id_station == st) %>%
+    na.omit()
+  
+  dat_long <- dat_st %>%
+    pivot_longer(cols = c(irps24h, irps24kf, irps48h, irps48kf),
+                 names_to = "model",
+                 values_to = "value") %>%
+    mutate(model = factor(model)) %>%
+    cutData(type = "season")
+  
+  for (ss in unique(dat_long$season)) {
+    dat_season <- filter(dat_long, season == ss)
+    
+    if (nrow(dat_season) > 0) {
+      TaylorDiagram(dat_season,
+                    obs = "irps_obs",
+                    mod = "value",
+                    group = "model",
+                    col = c("red","blue","green","purple"),
+                    annotate = TRUE,
+                    plot = TRUE,
+                    main = paste("Taylor Diagram - Estación", st, "-", ss))
+    }
+  }
+}
+
+dev.off()
+
+##Modstats
+
+
+
+library(openair)
+library(dplyr)
+
+# Asegurar tipos
+dat_long <- dat_long %>%
+  mutate(id_station = as.factor(id_station),
+         season = as.factor(season),
+         model = as.factor(model))
+
+# Dividir el dataset por estación y temporada
+split_data <- dat_long %>%
+  group_by(id_station, season) %>%
+  group_split()
+
+# Calcular modStats para cada grupo
+results_list <- lapply(split_data, function(df) {
+  res <- modStats(df, obs = "irps_obs", mod = "value", type = "model")
+  res$id_station <- unique(df$id_station)
+  res$season <- unique(df$season)
+  res
+})
+
+# Unir todos los resultados
+results_all <- bind_rows(results_list)
+
+# Verificar
+head(results_all)
+
+# Guardar en CSV
+write.csv(results_all,
+          "C:/Users/analisis/Documents/IRPS/modStats_por_estacion_y_season.csv",
+          row.names = FALSE)
+
