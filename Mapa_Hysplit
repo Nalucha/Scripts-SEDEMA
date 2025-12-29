@@ -1,0 +1,145 @@
+library(sf)
+library(terra)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library('maps')
+library('mapproj')
+library('mapdata')
+library(openair)
+library(ggmap)
+library(tmaps)
+library(usethis)
+library(devtools)
+
+devtools::install_github("nowosad/spData")
+install.packages("tmap", repos = c("https://r-tmap.r-universe.dev",
+                                   "https://cloud.r-project.org"))
+library(tmap)    # for static and interactive maps
+library(leaflet) # for interactive maps
+library(ggplot2) # tidyverse data visualization package
+
+traj_AJM121$day <- as.Date(traj_AJM121$date)
+
+library(ggmap)
+
+# Coordenadas (lon, lat)
+coordenadas <- c(lon = -99.1276, lat = 19.4284) 
+
+
+
+
+traj_filtrado <- trajPlot(selectByDate(traj_CUA, start = "10/3/2022", end ="11/3/2022"), lon = "lon", lat = "lat", map = TRUE, map.fill = F, map.res = "state", projection="albers",  orientation = c(45,270,0), grid.col = F, type = "day", col = "jet", lwd = 2, key.pos = "right", key.col = 1)
+
+
+coords <- data.frame(
+  lon = traj_filtrado$lon,  # Cambia 'lon' a la columna correcta si es necesario
+  lat = traj_filtrado$lat    # Cambia 'lat' a la columna correcta si es necesario
+)
+
+# Crear el mapa con leaflet
+mapa <- leaflet() %>%
+  addTiles() %>%  # Agregar el mapa base
+  addPolylines(data = coords, lng = ~lon, lat = ~lat, color = "blue", weight = 2)  # Agregar las trayectorias
+
+# Mostrar el mapa
+mapa
+
+
+
+## tmap nunca se pudo instalar
+
+install_version("tmap", version = "3.0", repos = "http://cran.us.r-project.org")
+
+# Crear un objeto de tipo sf para las coordenadas
+library(sf)
+
+# Crear un data frame con tus coordenadas
+coords <- data.frame(lon = -99.1276, lat = 19.4284)
+
+# Convertir a objeto sf
+sf_coords <- st_as_sf(coords, coords = c("lon", "lat"), crs = 4326)
+
+# Crear un mapa
+tmap_mode("view")  # Para un mapa interactivo
+mapa <- tm_shape(sf_coords) +
+  tm_dots(size = 0.5, col = "red") +  # Puedes cambiar el color y tamaño
+  tm_basemap("OpenStreetMap")         # Tipo de mapa base
+
+install.packages("leaflet")
+library(leaflet)
+
+# Crear un mapa con las coordenadas
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = -99.1276, lat = 19.4284, popup = "Ubicación")
+
+
+
+
+## funcionó
+# Filtrar las trayectorias
+traj_filtrado <- selectByDate(traj_AJM121, start = "2023-12-24", end = "2023-12-24")
+
+# Verifica la estructura de traj_filtrado
+str(traj_filtrado)
+
+# Extraer las coordenadas
+coords <- data.frame(
+  lon = traj_filtrado$lon,  # Reemplaza 'lon' y 'lat' por los nombres correctos de las columnas
+  lat = traj_filtrado$lat)
+
+# Crear el mapa con leaflet
+mapa <- leaflet() %>%
+  addTiles() %>%  # Agregar el mapa base
+  addPolylines(data = coords, lng = ~lon, lat = ~lat, color = "blue", weight = 2)  # Agregar las trayectorias
+
+# Mostrar el mapa
+mapa
+
+
+
+##Otra opción
+
+library(leaflet)
+library(dplyr)
+library(openair)
+library(RColorBrewer)  # Para paletas de colores
+
+# Filtrar las trayectorias
+traj_filtrado <- selectByDate(traj_CUA, start = "2022-02-15", end = "2022-02-21")
+
+# Suponiendo que tienes una columna 'id' para cada trayectoria
+coords <- data.frame(
+  lon = traj_filtrado$lon,  # Cambia 'lon' y 'lat' por los nombres correctos
+  lat = traj_filtrado$lat,
+  id = traj_filtrado$id      # Asegúrate de que esta columna exista
+)
+
+# Crear una paleta de colores
+unique_ids <- unique(coords$id)
+pal <- colorFactor(brewer.pal(length(unique_ids), "Set3"), domain = unique_ids)
+
+# Crear el mapa
+mapa <- leaflet() %>%
+  addTiles()
+
+# Agregar cada trayectoria en un color diferente
+for (id in unique_ids) {
+  trayectoria <- coords %>% filter(id == !!id)
+  
+  mapa <- mapa %>%
+    addPolylines(data = trayectoria, lng = ~lon, lat = ~lat, color = pal(id), weight = 2)
+}
+
+# Mostrar el mapa
+mapa
+
+
+
+trajPlot(selectByDate(traj_CUA, start = "15/8/2014", end ="21/8/2014"), lon = "lon", lat = "lat", map = TRUE ,map.fill = F, map.res = "state", projection="albers", grid.col = F, type = "day", col = "jet", lwd = 2, key.pos = "right", key.col = 1)
+
+
+## saber dirección predominante
+clust <- trajCluster(traj, method = "Angle", n.cluster= 6, col = "Set2",
+                     map.cols = openColours("Paired", 10))
