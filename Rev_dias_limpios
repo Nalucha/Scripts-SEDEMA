@@ -1,0 +1,60 @@
+library(evola3)
+library(dplyr)
+library(lubridate)
+
+def_user("estadistica", servidor = 134)
+
+
+om <- rama_con(
+  "o3",
+  start = "28/11/2025",
+  end = "04/12/2025")
+
+
+tail(om)
+
+om <- om %>% 
+  mutate(date = as.Date(date))
+
+om_max <- om %>% 
+  dplyr::group_by(date, id_station) %>% 
+  dplyr::summarise(maximo = max(valor, na.rm = T))
+                   
+                   
+    om_max1 <- om_max %>% 
+                     dplyr::group_by(date, id_station) %>% 
+                     dplyr::summarise(valores_mayores_90 = maximo[maximo > 90])
+
+
+tail(om_max)
+
+write.csv(om_max1, "C:/Users/analisis/Documents/IRPS/om_max1.csv")
+
+pm <- rama_con(
+  "pm25",
+  start = "26/09/2025",
+  end = "02/10/2025")
+
+
+so <- rama_con(
+  "so2",
+  start = "14/11/2025",
+  end = "20/11/2025")
+
+
+tail(so)
+
+so <- so %>% 
+  mutate(date = as.Date(date))
+
+so_max <- om %>% 
+  dplyr::group_by(date, id_station) %>% 
+  dplyr::summarise(maximo = max(valor, na.rm = T))
+
+
+so_max1 <- so_max %>% 
+  dplyr::group_by(date, id_station) %>% 
+  dplyr::summarise(valores_mayores_90 = maximo[maximo > 90])
+
+
+write.csv(so_max, "C:/Users/analisis/Documents/IRPS/so_max.csv")
