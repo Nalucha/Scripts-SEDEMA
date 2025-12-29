@@ -1,0 +1,102 @@
+
+#trabajar datos para graficar dejando hora
+
+library(dplyr)
+library(openair)
+
+#union fecha y hora
+#Se trabajo csv por afuera
+#modificacion hora
+
+so2_clean$HORA <- sprintf("%02d:00", no21_clean$HORA)  # Esto convertirá 8 a "08:00"
+
+View(so2_clean)
+
+so2_clean$FECHA_HORA <- as.POSIXct(paste(no21_clean$FECHA, so2_clean$HORA), format = "%d/%m/%Y %H:%M")
+
+
+
+View(so2_clean)
+
+write.csv(so2_clean, file ="so2_clean.csv", row.names=FALSE)
+
+#cambio todo a fecha
+so2_clean$FECHA <- as.Date(so2_clean$FECHA_HORA)# Asegúrate de que esté en el formato adecuado
+
+#cambio nombre columna
+colnames(so2_clean)[colnames(so2_clean) == "FECHA_HORA"] <- "date"
+
+# Estaciones que deseas eliminar
+estaciones_a_eliminar <- c("B", "D")
+
+# Filtrar el data frame para quitar las estaciones
+so2_fil <- so2_clean %>%
+  filter(!id_station %in% c("AJU", "MPA", "GAM", "XAL", "LPR","CHO"))
+
+
+write.csv(so2_fil, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/contaminantes_2023/so2_fil.csv")
+
+
+no21_fil$date <- as.POSIXct(no21_fil$date, format = "%d-%m-%Y %H:%M")
+
+
+class(no21_fil$date)
+
+View(no21_fil)
+
+no21_fil$o3 <- as.numeric(no21_fil$o3)
+no21_fil$no2 <- as.numeric(no21_fil$no2)
+no21_fil$so2 <- as.numeric(no21_fil$so2)
+no21_fil$co <- as.numeric(no21_fil$co)
+
+
+timePlot(no21_fil, pollutant = "o3", avg.time = "2 week",
+         y.relation = "free")
+
+timePlot(selectByDate(no21_fil, year = 2023, month = "enero"),  pollutant = c("o3", "no2", "so2", "co"),
+y.relation = "free")
+
+#timeplot diferentes estaciones
+
+no22_fil <- no21_fil %>% filter(id_station %in% c("ACO", "CUT", "CUA", "MER", "MON", "MPA"))
+
+View(no22_fil)
+
+timePlot(no22_fil, pollutant = "so2", type = "id_station")
+
+timePlot(no22_fil, pollutant = "o3", type = "id_station")
+
+
+wsp_dr <- wsp_wdr_clean %>% filter(id_station %in% c("ACO", "CUT", "CUA", "MER", "MON"))
+
+View(wsp_dr)
+
+write.csv(no22_fil, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/contaminantes_2023/no22_fil.csv")
+
+write.csv(wsp_dr, "C:/Users/analisis/Documents/Emisiones_Hysplit/Model_Inv/contaminantes_2023/wsp_dr.csv")
+
+
+#otro tipo de gráfico con viento
+no22_fil$date <- as.POSIXct(no22_fil$date, format = "%d-%m-%Y %H:%M")
+
+
+class(no22_fil$date)
+
+View(no22_fil)
+
+
+no22_fil$o3 <- as.numeric(no22_fil$o3)
+no22_fil$no2 <- as.numeric(no22_fil$no2)
+no22_fil$so2 <- as.numeric(no22_fil$so2)
+no22_fil$co <- as.numeric(no22_fil$co)
+no22_fil$ws <- as.numeric(no22_fil$ws)
+no22_fil$wd <- as.numeric(no22_fil$wd)
+
+timePlot(head(no22_fil, 24), pollutant = c("o3", "so2"), na.rm = TRUE,
+         windflow = list(scale = 0.1, lwd = 2, col = "blue"),
+         lwd = 3, group = FALSE,
+         ylab = "concentration (ug/m3)")
+
+calendarPlot(no22_fil, year = 2023, pollutant = "o3")
+
+
