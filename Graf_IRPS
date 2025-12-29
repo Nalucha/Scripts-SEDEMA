@@ -1,0 +1,278 @@
+library(evola3)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+
+def_user("estadistica", servidor = 134)
+
+
+##### OZONO  
+
+o3 <- movil_con(parametro = "o3", start = "1/1/2024", end = "31/1/2024")
+
+##obtener fecha sin hora
+
+o3 <- o3 %>%
+  mutate(date_only = as.Date(date))
+
+
+# obtener el máximo
+
+
+o3_maximos <- o3 %>%
+  group_by(date, id_station) %>%
+  summarise(valor_maximo = max(valor, na.rm = TRUE))
+
+
+colnames(o3_maximos)[colnames(o3_maximos) == "valor_maximo"] <- "o3"
+
+
+##### PM25
+
+pm25 <- promedio_con(parametro = "pm25", start = "1/1/2024", end = "31/1/2024") 
+
+##obtener fecha sin hora
+
+pm25 <- pm25 %>%
+  mutate(date_only = as.Date(date))
+
+## cambiar de columna a filas
+
+
+pm25 <- suficiencia(df_completo, 
+            temporada = "mensual",
+            columna.valor = "pm25",
+            columna.fecha = "date",
+            columna.estaciones = "id_station"
+)
+
+## obtener el máximo, esto NO SIRVE, pero limpia la base
+
+pm25_maximos <- pm25 %>%
+  group_by(date_only, estacion) %>%
+  summarise(valor_maximo = max(valor, na.rm = TRUE))
+
+
+colnames(pm25_maximos)[colnames(pm25_maximos) == "valor_maximo"] <- "pm25"
+
+#### NO2
+
+no2 <- promedio_con(parametro = "no2", start = "1/1/2024", end = "31/1/2024")
+
+
+##obtener fecha sin hora
+
+no2 <- no2 %>%
+  mutate(date_only = as.Date(date))
+
+## cambiar de columna a filas
+
+no2m <- suficiencia(no2, 
+            temporada = "mensual",
+            columna.valor = "no2",
+            columna.fecha = "date",
+            columna.estaciones = "id_station"
+)
+
+## obtener el máximo
+
+no2_maximos <- no2m %>%
+  group_by(date, id_station) %>%
+  summarise(valor_maximo = max(valor, na.rm = TRUE))
+
+
+colnames(no2_maximos)[colnames(no2_maximos) == "valor_maximo"] <- "no2"
+
+
+##Unir dataframes
+
+# Merge based on the 'ID' column
+o3_maximos <- o3_maximos %>%
+  rename(o3 = contaminante)
+
+pm25_maximos <- pm25_maximos %>%
+  rename(pm25 = contaminante)
+
+no2_maximos <- no2_maximos %>%
+  rename(no2 = contaminante)
+
+df_completo <- o3_maximos %>%
+  left_join(pm25_maximos, by = c("date", "estacion")) %>%
+  left_join(no2_maximos, by = c("date", "estacion"))
+
+
+### Eliminar finite, non-finite data y cambiar a NA
+
+
+df_completo[sapply(df_completo, is.numeric)][!sapply(df_completo[sapply(df_completo, is.numeric)], is.finite)] <- NA
+
+
+write.csv(df_completo, "C:/Users/analisis/Documents/IRPS/df_completo.csv")
+
+
+### Cálculo IRPS
+
+
+
+
+library(dplyr)
+library(lubridate)
+
+
+df_completo$date <- as.POSIXct(df_completo$date, format = "%Y-%m-%d")
+
+# Paso 1: Calcular IRPS por fila (si no lo has hecho)
+df_completo <- df_completo %>%
+  mutate(
+    pm25ex = if_else(!is.na(pm25), 100 * (exp(0.002586 * pm25) - 1), NA_real_),
+    o3ex   = if_else(!is.na(o3),    100 * (exp(0.001593 * o3) - 1),    NA_real_),
+    no2ex  = if_else(!is.na(no2),   100 * (exp(0.0005243 * no2) - 1),  NA_real_),
+    tr     = if_else(!is.na(pm25ex) & !is.na(o3ex) & !is.na(no2ex),
+                     pm25ex + o3ex + no2ex, NA_real_),
+    IRPS   = if_else(!is.na(tr), (10 / 37.2) * tr, NA_real_)
+  )
+
+##df_diario <- df_completo %>%
+  #group_by(date, estacion) %>%
+  #summarise(IRPS_promedio = mean(IRPS, na.rm = TRUE), .groups = "drop")
+
+# Paso 3: Unir el IRPS promedio como nueva columna al dataframe original
+#df_completo <- df_completo %>%
+  #left_join(df_diario, by = c("date", "estacion"))
+
+
+suf <- suficiencia(df_completo,
+                     temporada = "mensual",
+                     columna.valor = "IRPS",
+                     columna.fecha = "date",
+                     columna.estaciones = "id_station")
+
+
+
+write.csv(df_completo, "C:/Users/analisis/Documents/IRPS/df_completo.csv")
+
+
+
+library(ggplot2)
+library(scales)  # para formatear fechas si es necesario
+
+df_completo <- df_completo %>%
+  mutate(date = as.Date(date))
+
+
+ggplot(df_completo, aes(x = date, y = IRPS, color = id_station)) +
+  geom_line() +
+  labs(title = "IRPS Enero 2024", x = "Fecha", y = "IRPS") +
+  scale_color_manual(values = c(
+    "AJM" = "blue", "BJU" = "green3", "CAM" = "red", "CCA" = "purple",
+    "HGM" = "orange", "MER" = "yellow", "PED" = "brown", "SAC" = "black",
+    "SAG" = "darkgreen", "UIZ" = "darkblue"
+  )) +
+  # Más marcas en el eje Y
+  scale_y_continuous(breaks = pretty(df_completo$IRPS, n = 10)) +
+  
+  # Mejoras en eje X (fechas)
+  scale_x_date(date_breaks = "3 days", date_labels = "%d-%b") +
+ 
+  theme(axis.text.x = element_text(angle = 90)) +
+  
+  # Tema limpio
+  theme_minimal(base_size = 12) +
+  
+  # Eliminar la malla pero mantener líneas del eje
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    axis.line = element_line(color = "black"),
+    legend.title = element_blank()
+  )
+
+## PRUEBAS ESTADISTICAS
+
+# Paquetes necesarios
+library(dplyr)
+library(ggpubr)
+library(car)       # para Levene's Test
+library(FSA)       # para Dunn Test (post-hoc no paramétrico)
+library(ggplot2)
+library(rstatix)   # para resumen estadístico ordenado (opcional)
+
+
+install.packages(c("dplyr", "car", "FSA", "ggplot2"))
+
+
+## Limpiar NAs
+
+library(dplyr)
+
+# Asegúrate de que 'id_station' es factor y elimina NA
+df_sin_na <- df_completo %>%
+  filter(!is.na(IRPS)) %>%
+  mutate(id_station = as.factor(id_station))
+
+
+## quitar estación TLA
+df_sin_na <- df_completo %>%
+  filter(id_station != "TLA") %>%     # elimina TLA
+  filter(!is.na(IRPS)) %>%            # elimina NA en IRPS
+  mutate(id_station = as.factor(id_station))  # asegura que sea factor
+
+
+## Evaluar normalidad
+
+library(ggplot2)
+library(dplyr)
+
+df_sin_na %>%
+  ggplot(aes(sample = IRPS, color = id_station)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~id_station, scales = "free") +
+  labs(
+    title = "Q-Q Plots por estación",
+    x = "Teórico (normal)",
+    y = "Observado"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")  # 👈 Esto quita la leyenda
+
+
+
+
+## Prueba homogeneidad de varianza (Levene's Test)
+
+library(car)
+
+leveneTest(IRPS ~ id_station, data = df_sin_na)
+
+
+##ANOVA si valor Pr(>F) ej 0.214 > 0.05 no hay evidencia estadísticaentre los valores de IRPS de las estaciones
+
+anova_result <- aov(IRPS ~ id_station, data = df_sin_na)
+summary(anova_result)
+
+ ## TUKEY
+TukeyHSD(anova_result)
+
+
+# Ejemplo: Kruskal-Wallis p-value > 0.05 no hay evidencia de diferencias medianas de IRPS entre estaciones
+kruskal.test(IRPS ~ id_station, data = df_sin_na)
+
+# Dunn test p.adj < 0.05 ej 0 pares ningún par de estaciones tiene diferencias significativas IRPS
+library(FSA)
+dunn_result <- dunnTest(IRPS ~ id_station, data = df_sin_na, method = "bonferroni")
+
+significativos <- dunn_result$res %>% filter(P.adj < 0.05)
+
+print(significativos)
+
+
+##BOXPLOT puntos outliners
+ggplot(df_sin_na, aes(x = id_station, y = IRPS, fill = id_station)) +
+  geom_boxplot() +
+  labs(title = "Distribución de IRPS por estación", x = "Estación", y = "IRPS") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
